@@ -1,33 +1,43 @@
-// config/db.js
+
 const mongoose = require("mongoose");
 
 const connectDB = async () => {
     const mongoUri = process.env.MONGODB_URI;
 
+    // Check whether MongoDB URI exists
     if (!mongoUri) {
         throw new Error(
             "MONGODB_URI is required. Set it to your MongoDB Atlas connection string."
         );
     }
 
-    if (!/^mongodb(?:\+srv)?:\/\//i.test(mongoUri) || /[<>]/.test(mongoUri)) {
+    // Validate MongoDB connection string
+    if (
+        !/^mongodb(?:\+srv)?:\/\//i.test(mongoUri) ||
+        /[<>]/.test(mongoUri)
+    ) {
         throw new Error(
-            "MONGODB_URI is not a complete MongoDB connection string. Copy the URI from Atlas and replace its placeholders."
+            "MONGODB_URI is not a valid MongoDB connection string."
         );
     }
 
     try {
-        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 15000 });
+        await mongoose.connect(mongoUri, {
+            serverSelectionTimeoutMS: 15000
+        });
+
+        console.log("MongoDB connected successfully");
+
     } catch (error) {
         if (/ENOTFOUND|EAI_AGAIN|querySrv/i.test(error.message)) {
             throw new Error(
-                "MongoDB Atlas DNS lookup failed. Verify the cluster hostname in MONGODB_URI against Atlas's current application connection string.",
+                "MongoDB Atlas DNS lookup failed. Verify your cluster hostname.",
                 { cause: error }
             );
         }
+
         throw error;
     }
-    console.log("MongoDB connected successfully");
 };
 
 module.exports = connectDB;
