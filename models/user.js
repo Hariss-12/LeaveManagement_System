@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    department: { type: String, trim: true, default: "Not specified" },
+    passwordHash: { type: String, select: false },
+    role: { type: String, enum: ["student"], default: "student" },
+
     casualLeave: {
       type: Number,
       default: 0,

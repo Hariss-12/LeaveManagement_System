@@ -4,12 +4,13 @@ const cors = require("cors");
 const path = require("node:path");
 const connectDB = require("./config/db");
 const leaveRoutes = require("./routes/leaveRoutes");
+const authRoutes = require("./routes/authRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5050;
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
@@ -28,6 +29,7 @@ app.get("/", (req, res) => {
 });
 
 // Register all leave-management routes under /api
+app.use("/api/auth", authRoutes);
 app.use("/api", leaveRoutes);
 
 // Handle unknown API routes
@@ -46,6 +48,13 @@ app.use((err, req, res, next) => {
     return next(err);
   }
 
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid JSON request",
+    });
+  }
+
   res.status(err.status || 500).json({
     success: false,
     message: err.status === 400
@@ -59,7 +68,7 @@ async function startServer() {
   try {
     await connectDB();
 
-    app.listen(PORT, () => {
+    return app.listen(PORT, () => {
       console.log(`Backend running at http://localhost:${PORT}`);
       console.log(`API health check: http://localhost:${PORT}/api/health`);
     });
@@ -69,4 +78,9 @@ async function startServer() {
   }
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;
+module.exports.startServer = startServer;

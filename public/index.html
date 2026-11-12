@@ -1,158 +1,226 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
+<<<<<<< HEAD
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Leave Management System</title>
   <script src="./app.js" defer></script>
+=======
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#123c35">
+    <title>Leave Management | Campus Portal</title>
+    <link rel="stylesheet" href="style.css">
+>>>>>>> a0b422f (Update sign-in page)
 </head>
 
 <body>
-  <div class="container">
+    <div class="container">
+        <header class="app-header">
+            <a class="brand" href="/" aria-label="Campus Leave home">
+                <span class="brand-mark" aria-hidden="true">C</span>
+                <span><strong>Campus Leave</strong><small>Student services portal</small></span>
+            </a>
+        </header>
 
-    <h1>Leave Management System</h1>
+        <main>
+            <section id="auth-view" class="auth-layout auth-layout-centered" aria-labelledby="auth-title">
+                <div class="auth-card">
+                    <div class="auth-heading">
+                        <h2 id="auth-title">Sign in to your account</h2>
+                        <p id="auth-description">Sign in with your registered college email and password.</p>
+                    </div>
 
-    <!-- Login Section -->
-    <div id="login-section" class="form-section">
-      <h2>Login</h2>
+                    <section id="student-login-panel" class="auth-panel" aria-label="Student sign in">
+                        <form id="student-login-form" autocomplete="on">
+                            <label for="student-login-email">Registered email</label>
+                            <input id="student-login-email" name="email" type="email" autocomplete="username"
+                                placeholder="you@college.edu" required>
+                            <label for="student-login-password">Password</label>
+                            <input id="student-login-password" name="password" type="password"
+                                autocomplete="current-password" minlength="8" required>
+                            <button class="btn" type="submit">Sign in</button>
+                        </form>
+                        <p class="auth-switch">New student? <button type="button" id="show-registration"
+                                class="link-btn">Create an account</button></p>
+                    </section>
 
-      <form id="login-form">
-        <label for="email">Email:</label>
-        <input type="email" id="email" required>
+                    <section id="warden-login-panel" class="auth-panel" aria-label="Warden sign in" hidden>
+                        <form id="warden-login-form" autocomplete="on">
+                            <label for="warden-login-username">Warden username</label>
+                            <input id="warden-login-username" name="username" type="text" autocomplete="username"
+                                required>
+                            <label for="warden-login-password">Password</label>
+                            <input id="warden-login-password" name="password" type="password"
+                                autocomplete="current-password" required>
+                            <button class="btn" type="submit">Sign in as warden</button>
+                        </form>
+                        <p class="helper-text">Warden access is limited to assigned staff accounts.</p>
+                    </section>
 
-        <button type="submit" class="btn">
-          Login
-        </button>
-      </form>
+                    <section id="registration-panel" class="auth-panel" hidden>
+                        <p class="eyebrow">STUDENT ACCOUNT</p>
+                        <h2>Create your account</h2>
+                        <form id="registration-form" autocomplete="on">
+                            <label for="register-name">Full name</label>
+                            <input id="register-name" name="username" type="text" autocomplete="name" maxlength="100"
+                                required>
+                            <label for="register-email">College email</label>
+                            <input id="register-email" name="email" type="email" autocomplete="email" required>
+                            <label for="register-number">Register number</label>
+                            <input id="register-number" name="rollNumber" type="text" maxlength="40" required>
+                            <label for="register-department">Department</label>
+                            <input id="register-department" name="department" type="text" maxlength="100" required>
+                            <label for="register-password">Create password</label>
+                            <input id="register-password" name="password" type="password" autocomplete="new-password"
+                                minlength="8" maxlength="128" required>
+                            <p class="helper-text">Use at least 8 characters.</p>
+                            <button class="btn" type="submit">Create student account</button>
+                        </form>
+                        <p class="auth-switch">Already registered? <button type="button" id="show-login"
+                                class="link-btn">Back to sign in</button></p>
+                    </section>
+                    <p id="response-message" class="response-message" role="status" aria-live="polite"></p>
+                </div>
+            </section>
 
-      <p>
-        Don't have an account?
-        <button type="button" id="show-registration" class="link-btn">
-          Create User
-        </button>
-      </p>
+            <section id="student-dashboard" class="dashboard" hidden aria-labelledby="student-dashboard-title">
+                <header class="dashboard-header">
+                    <div>
+                        <p class="eyebrow">STUDENT PORTAL</p>
+                        <h1 id="student-dashboard-title">Your leave dashboard</h1>
+                        <p class="muted">Review your profile, submit a request, and track decisions.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary logout-button">Log out</button>
+                </header>
+                <section class="profile-card" aria-labelledby="profile-title">
+                    <div>
+                        <p class="eyebrow">YOUR PROFILE</p>
+                        <h2 id="profile-title"><span id="profile-name">Student</span></h2>
+                        <p><span id="profile-register-number"></span><span id="profile-department"></span></p>
+                        <p id="profile-email" class="muted"></p>
+                    </div>
+                    <div class="balance-grid">
+                        <div><span>Casual leave balance</span><strong id="casual-leave-balance">—</strong></div>
+                        <div><span>Medical leave balance</span><strong id="medical-leave-balance">—</strong></div>
+                    </div>
+                </section>
+                <div class="student-grid">
+                    <section class="panel" aria-labelledby="apply-title">
+                        <p class="eyebrow">NEW REQUEST</p>
+                        <h2 id="apply-title">Apply for leave</h2>
+                        <form id="leave-form">
+                            <label for="leave-type">Leave type</label>
+                            <select id="leave-type" name="leaveType" required>
+                                <option value="casual">Casual leave</option>
+                                <option value="medical">Medical leave</option>
+                            </select>
+                            <div class="date-grid">
+                                <div><label for="leave-from">From</label><input id="leave-from" name="fromDate"
+                                        type="date" required></div>
+                                <div><label for="leave-to">To</label><input id="leave-to" name="toDate" type="date"
+                                        required></div>
+                            </div>
+                            <label for="leave-reason">Reason</label>
+                            <textarea id="leave-reason" name="reason" rows="4" minlength="5" maxlength="1000"
+                                placeholder="Share the reason for your request" required></textarea>
+                            <button class="btn" type="submit">Submit for review</button>
+                        </form>
+                    </section>
+                    <section class="panel history-panel" aria-labelledby="history-title">
+                        <div class="section-heading">
+                            <div>
+                                <p class="eyebrow">APPLICATIONS</p>
+                                <h2 id="history-title">Leave history</h2>
+                            </div><button type="button" id="refresh-history" class="link-btn">Refresh</button>
+                        </div>
+                        <div id="student-leave-list" class="application-list" aria-live="polite">
+                            <p class="muted">Your submitted applications will appear here.</p>
+                        </div>
+                    </section>
+                </div>
+            </section>
+
+            <section id="warden-dashboard" class="dashboard" hidden aria-labelledby="warden-dashboard-title">
+                <header class="dashboard-header">
+                    <div>
+                        <p class="eyebrow">WARDEN PORTAL</p>
+                        <h1 id="warden-dashboard-title">Leave approvals</h1>
+                        <p class="muted">Review applications and record your decision.</p>
+                    </div>
+                    <button type="button" class="btn btn-secondary logout-button">Log out</button>
+                </header>
+                <section class="stat-grid" aria-label="Application totals">
+                    <article class="stat-card"><span>Total applications</span><strong id="stat-total">0</strong>
+                    </article>
+                    <article class="stat-card"><span>Pending</span><strong id="stat-pending">0</strong></article>
+                    <article class="stat-card"><span>Approved</span><strong id="stat-approved">0</strong></article>
+                    <article class="stat-card"><span>Rejected</span><strong id="stat-rejected">0</strong></article>
+                </section>
+                <section class="panel review-panel" aria-labelledby="applications-title">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">REVIEW QUEUE</p>
+                            <h2 id="applications-title">Applications</h2>
+                        </div>
+                        <div class="table-controls"><label class="visually-hidden" for="application-search">Search by
+                                student name or register number</label><input id="application-search" type="search"
+                                placeholder="Search name or register number"><label class="visually-hidden"
+                                for="status-filter">Filter by status</label><select id="status-filter">
+                                <option value="">All statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                            </select></div>
+                    </div>
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Register no.</th>
+                                    <th>Department</th>
+                                    <th>Leave</th>
+                                    <th>Dates</th>
+                                    <th>Submitted</th>
+                                    <th>Status</th>
+                                    <th>Review</th>
+                                </tr>
+                            </thead>
+                            <tbody id="warden-application-rows">
+                                <tr>
+                                    <td colspan="8" class="muted">Applications will appear here.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+        </main>
+        <footer class="app-footer"><span>Campus Leave Management</span><span>Need help? Contact your department
+                office.</span></footer>
     </div>
 
-    <!-- Registration Section -->
-    <div id="registration-section" class="form-section" style="display: none;">
-
-      <h2>Create User</h2>
-
-      <form id="registration-form">
-
-        <label for="username">Username:</label>
-        <input type="text" id="username" required>
-
-        <label for="reg-email">Email:</label>
-        <input type="email" id="reg-email" required>
-
-        <label for="roll-number">Roll Number:</label>
-        <input type="text" id="roll-number" required>
-
-        <label for="casual-leave">
-          Initial Casual Leave:
-        </label>
-        <input type="number" id="casual-leave" min="0" step="1" value="0" required>
-
-        <label for="medical-leave">
-          Initial Medical Leave:
-        </label>
-        <input type="number" id="medical-leave" min="0" step="1" value="0" required>
-
-        <button type="submit" class="btn">
-          Register
-        </button>
-      </form>
-
-      <p>
-        Already have an account?
-        <button type="button" id="show-login" class="link-btn">
-          Login
-        </button>
-      </p>
-
-      <div id="registration-response"></div>
-    </div>
-
-    <!-- Leave Balance Section -->
-    <div id="balance-section" class="balance-section" style="display: none;">
-
-      <h2>Leave Balance</h2>
-
-      <p>
-        Welcome,
-        <span id="username-display"></span>
-        (Roll Number:
-        <span id="roll-number-display"></span>)
-      </p>
-
-      <div id="leave-balance">
-        <p>
-          Casual Leave:
-          <span id="casual-leave-display">
-            Loading...
-          </span>
-        </p>
-
-        <p>
-          Medical Leave:
-          <span id="medical-leave-display">
-            Loading...
-          </span>
-        </p>
-      </div>
-
-      <button type="button" id="refresh-balance" class="btn">
-        Refresh Balance
-      </button>
-
-      <button type="button" id="logout-button" class="btn" style="display: none;">
-        Logout
-      </button>
-    </div>
-
-    <!-- Apply Leave Section -->
-    <div id="apply-leave-section" class="apply-leave-section" style="display: none;">
-
-      <h2>Apply for Leave</h2>
-
-      <form id="leave-form">
-
-        <label for="leave-type">
-          Leave Type:
-        </label>
-
-        <select id="leave-type">
-          <option value="casual">
-            Casual
-          </option>
-
-          <option value="medical">
-            Medical
-          </option>
-        </select>
-
-        <label for="leave-days">
-          Number of Days:
-        </label>
-
-        <input type="number" id="leave-days" min="1" step="1" required>
-
-        <button type="submit" class="btn">
-          Apply Leave
-        </button>
-
-      </form>
-    </div>
-
-    <!-- Response Message -->
-    <div id="response-message"></div>
-
-  </div>
-
-  <!-- Frontend JavaScript -->
-  <script src="/app.js" defer></script>
-
+    <dialog id="application-dialog" aria-labelledby="application-dialog-title">
+        <div class="dialog-heading">
+            <div>
+                <p class="eyebrow">APPLICATION DETAILS</p>
+                <h2 id="application-dialog-title">Leave application</h2>
+            </div><button type="button" id="close-application-dialog" class="icon-button"
+                aria-label="Close details">×</button>
+        </div>
+        <div id="application-details"></div>
+        <form id="review-form" hidden>
+            <label for="review-remarks">Rejection remarks</label>
+            <textarea id="review-remarks" name="remarks" rows="3" maxlength="1000"
+                placeholder="Required when rejecting"></textarea>
+            <div class="dialog-actions"><button type="button" id="approve-application"
+                    class="btn">Approve</button><button type="button" id="reject-application"
+                    class="btn btn-danger">Reject</button></div>
+        </form>
+    </dialog>
+    <script src="/app.js" defer></script>
 </body>
 
 </html>
