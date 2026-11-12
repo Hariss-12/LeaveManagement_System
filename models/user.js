@@ -26,6 +26,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, "Roll number is required"],
       trim: true,
+      unique: true,
     },
 
     department: { type: String, trim: true, default: "Not specified" },

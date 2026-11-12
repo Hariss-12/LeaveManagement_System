@@ -17,7 +17,12 @@ async function apiRequest(url, options = {}) {
       throw new Error("The server returned an invalid response.");
     }
   }
-  if (!response.ok) throw new Error(data.message || `Request failed (${response.status})`);
+  if (!response.ok) {
+    const error = new Error(data.message || `Request failed (${response.status})`);
+    error.code = data.code;
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 
@@ -33,7 +38,11 @@ function showAuthPanel(panel) {
   byId("registration-panel").hidden = panel !== "registration";
   byId("auth-title").textContent = panel === "registration"
     ? "Create your student account"
-    : panel === "warden" ? "Warden sign in" : "Sign in to your account";
+    : panel === "warden" ? "Warden sign in" : "Student sign in";
+  byId("auth-eyebrow").textContent = panel === "warden" ? "STAFF ACCESS" : "STUDENT PORTAL";
+  byId("auth-description").textContent = panel === "warden"
+    ? "Use your assigned staff credentials to continue."
+    : "Use your registered college email and password to continue.";
   byId("auth-description").hidden = panel === "registration";
   showMessage("");
 }
@@ -65,25 +74,48 @@ function showLogin() {
 async function submitLogin(event, endpoint) {
   event.preventDefault();
   const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const originalText = button.textContent;
   const body = Object.fromEntries(new FormData(form));
+  button.disabled = true;
+  button.textContent = "Signing in…";
   try {
     const result = await apiRequest(endpoint, { method: "POST", body: JSON.stringify(body) });
     showDashboard(result.user);
   } catch (error) {
     showMessage(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
   }
 }
 
 async function registerStudent(event) {
   event.preventDefault();
-  const body = Object.fromEntries(new FormData(event.currentTarget));
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const originalText = button.textContent;
+  const body = Object.fromEntries(new FormData(form));
+  button.disabled = true;
+  button.textContent = "Creating account…";
   try {
     const result = await apiRequest("/api/auth/register", { method: "POST", body: JSON.stringify(body) });
-    event.currentTarget.reset();
+    byId("student-login-email").value = body.email.trim();
+    form.reset();
     showAuthPanel("student");
     showMessage(result.message);
   } catch (error) {
-    showMessage(error.message, true);
+    if (error.code === "EMAIL_EXISTS") {
+      byId("student-login-email").value = body.email.trim();
+      form.reset();
+      showAuthPanel("student");
+      showMessage("That email already has an account. Sign in with it below.");
+    } else {
+      showMessage(error.message, true);
+    }
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
   }
 }
 
@@ -251,11 +283,12 @@ byId("show-student-login").addEventListener("click", () => showAuthPanel("studen
 document.querySelectorAll(".logout-button").forEach((button) => button.addEventListener("click", logout));
 byId("leave-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const body = Object.fromEntries(new FormData(event.currentTarget));
+  const form = event.currentTarget;
+  const body = Object.fromEntries(new FormData(form));
   try {
     const result = await apiRequest("/api/student/leaves", { method: "POST", body: JSON.stringify(body) });
     showMessage(result.message);
-    event.currentTarget.reset();
+    form.reset();
     await loadStudentLeaves();
   } catch (error) {
     showMessage(error.message, true);

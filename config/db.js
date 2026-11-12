@@ -1,5 +1,44 @@
 
 const mongoose = require("mongoose");
+const dns = require("node:dns");
+
+const fallbackDnsServers = ["1.1.1.1", "8.8.8.8"];
+const isSrvDnsError = (error) =>
+    /querySrv/i.test(error?.message || "") &&
+    ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ETIMEOUT"].includes(error?.code);
+
+const connectWithSrvDnsFallback = async (mongoUri) => {
+    try {
+        return await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 15000 });
+    } catch (error) {
+        if (!isSrvDnsError(error)) throw error;
+
+        let lastError = error;
+        const originalDnsServers = dns.getServers();
+
+        for (const dnsServer of fallbackDnsServers) {
+            try {
+                // Some Windows/managed DNS resolvers reject SRV queries; retry the
+                // Atlas lookup with a public resolver before giving up.
+                dns.setServers([dnsServer]);
+                const connection = await mongoose.connect(mongoUri, {
+                    serverSelectionTimeoutMS: 15000,
+                });
+                console.warn(`MongoDB SRV lookup succeeded using fallback DNS ${dnsServer}`);
+                return connection;
+            } catch (retryError) {
+                lastError = retryError;
+                if (!isSrvDnsError(retryError)) {
+                    dns.setServers(originalDnsServers);
+                    throw retryError;
+                }
+            }
+        }
+
+        dns.setServers(originalDnsServers);
+        throw lastError;
+    }
+};
 
 const connectDB = async () => {
     const mongoUri = process.env.MONGODB_URI;
@@ -22,9 +61,7 @@ const connectDB = async () => {
     }
 
     try {
-        await mongoose.connect(mongoUri, {
-            serverSelectionTimeoutMS: 15000
-        });
+        await connectWithSrvDnsFallback(mongoUri);
 
         console.log("MongoDB connected successfully");
 

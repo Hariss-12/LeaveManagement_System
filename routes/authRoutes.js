@@ -30,11 +30,55 @@ router.post("/register", async (req, res) => {
     if (!values.username || !values.email || !values.rollNumber || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) return res.status(400).json({ success: false, message: "Enter a name, valid email, and register number" });
     if (password.length < 8 || password.length > 128) return res.status(400).json({ success: false, message: "Password must be between 8 and 128 characters" });
     const existing = await User.findOne({ $or: [{ email: values.email }, { rollNumber: values.rollNumber }] });
-    if (existing) return res.status(409).json({ success: false, message: "Email or register number already exists" });
+    if (existing) {
+      if (existing.email === values.email) {
+        return res.status(409).json({
+          success: false,
+          code: "EMAIL_EXISTS",
+          message: "An account with this email already exists. Sign in with it instead.",
+        });
+      }
+      return res.status(409).json({
+        success: false,
+        code: "ROLL_NUMBER_EXISTS",
+        message: "This register number is already linked to an account.",
+      });
+    }
     await User.create({ ...values, passwordHash: await hashPassword(password) });
     return res.status(201).json({ success: true, message: "Account created. Please log in." });
   } catch (error) {
-    if (error.code === 11000) return res.status(409).json({ success: false, message: "Email or register number already exists" });
+    if (error.code === 11000) {
+      const duplicateFields = Object.keys(error.keyPattern || error.keyValue || {});
+      const emailConflict = duplicateFields.includes("email") &&
+        (!error.keyValue?.email || error.keyValue.email === clean(req.body?.email).toLowerCase());
+      const rollNumberConflict = duplicateFields.includes("rollNumber") &&
+        (!error.keyValue?.rollNumber || error.keyValue.rollNumber === clean(req.body?.rollNumber));
+
+      if (emailConflict) {
+        return res.status(409).json({
+          success: false,
+          code: "EMAIL_EXISTS",
+          message: "An account with this email already exists. Sign in with it instead.",
+        });
+      }
+      if (rollNumberConflict) {
+        return res.status(409).json({
+          success: false,
+          code: "ROLL_NUMBER_EXISTS",
+          message: "This register number is already linked to an account.",
+        });
+      }
+
+      console.error("Registration hit an unexpected unique database index:", {
+        index: error.index,
+        keyPattern: error.keyPattern,
+        keyValue: error.keyValue,
+      });
+      return res.status(500).json({
+        success: false,
+        message: "Registration is blocked by a database constraint. Check the server logs.",
+      });
+    }
     console.error("Registration error:", error);
     return res.status(500).json({ success: false, message: "Registration failed due to a server error" });
   }
