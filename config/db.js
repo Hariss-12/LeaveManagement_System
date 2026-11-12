@@ -2,8 +2,16 @@
 const mongoose = require("mongoose");
 
 const connectDB = async () => {
-        await mongoose.connect(process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/leave-management", { serverSelectionTimeoutMS: 5000 });
-        console.log("MongoDB connected successfully");
+    const mongoUri = process.env.MONGODB_URI;
+
+    if (!mongoUri) {
+        throw new Error(
+            "MONGODB_URI is required. Set it to your MongoDB Atlas connection string."
+        );
+    }
+
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 10000 });
+    console.log("MongoDB connected successfully");
 };
 
 module.exports = connectDB;

@@ -31,7 +31,7 @@ router.post("/register", async (req, res) => {
     if (password.length < 8 || password.length > 128) return res.status(400).json({ success: false, message: "Password must be between 8 and 128 characters" });
     const existing = await User.findOne({ $or: [{ email: values.email }, { rollNumber: values.rollNumber }] });
     if (existing) return res.status(409).json({ success: false, message: "Email or register number already exists" });
-    const user = await User.create({ ...values, passwordHash: await hashPassword(password) });
+    await User.create({ ...values, passwordHash: await hashPassword(password) });
     return res.status(201).json({ success: true, message: "Account created. Please log in." });
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ success: false, message: "Email or register number already exists" });

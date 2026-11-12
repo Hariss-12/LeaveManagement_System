@@ -1,18 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
-<<<<<<< HEAD
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Leave Management System</title>
-  <script src="./app.js" defer></script>
-=======
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#123c35">
-    <title>Leave Management | Campus Portal</title>
-    <link rel="stylesheet" href="style.css">
->>>>>>> a0b422f (Update sign-in page)
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#123c35">
+  <title>Leave Management | Campus Portal</title>
+  <link rel="stylesheet" href="/style.css">
 </head>
 
 <body>
@@ -44,6 +37,8 @@
                         </form>
                         <p class="auth-switch">New student? <button type="button" id="show-registration"
                                 class="link-btn">Create an account</button></p>
+                        <p class="auth-switch">Staff member? <button type="button" id="show-warden-login"
+                                class="link-btn">Warden sign in</button></p>
                     </section>
 
                     <section id="warden-login-panel" class="auth-panel" aria-label="Warden sign in" hidden>
@@ -57,6 +52,8 @@
                             <button class="btn" type="submit">Sign in as warden</button>
                         </form>
                         <p class="helper-text">Warden access is limited to assigned staff accounts.</p>
+                        <p class="auth-switch"><button type="button" id="show-student-login"
+                                class="link-btn">Student sign in</button></p>
                     </section>
 
                     <section id="registration-panel" class="auth-panel" hidden>
@@ -220,7 +217,7 @@
                     class="btn btn-danger">Reject</button></div>
         </form>
     </dialog>
-    <script src="/app.js" defer></script>
+    <script type="module" src="/app.js"></script>
 </body>
 
 </html>

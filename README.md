@@ -1,28 +1,38 @@
 # Leave Management System
 
-Express and MongoDB application with a browser frontend.
+An Express and MongoDB leave management application with a browser frontend.
 
-## Run
+## Local development
 
-From this directory, run `npm install` if dependencies are missing, then `npm start`.
-Open http://localhost:5050. MongoDB must be running on port 27017.
-The server prints `MongoDB connected successfully` followed by
-`Server running at http://localhost:5050` when ready.
+Use Node.js 22 or newer. Copy `.env.example` to `.env`, then set these values:
 
-Optionally set `MONGODB_URI` and `PORT` to use another database or server port.
+- `MONGODB_URI`: a MongoDB Atlas connection string (`mongodb+srv://...`).
+- `AUTH_SECRET`: a private random string with at least 32 characters.
+- `WARDEN_USERNAME` and `WARDEN_PASSWORD`: the warden sign-in credentials.
+- `PORT` is optional; Render provides it automatically.
 
-Create a user with initial leave balances, log in using the same email, and apply
-for leave. For example, starting with 10 casual days and applying for 3 leaves
-7 casual days. Requests exceeding the available balance are rejected.
-Initial balances default to zero if omitted.
+Run `npm install`, then `npm start`. The Express server serves the app at
+`http://localhost:5050`. Do not commit `.env` or share its values.
 
-## Development and checks
+For Vite development, run `npm run dev` in another terminal and open the URL it
+prints. Requests to `/api` are proxied to the Express server on port 5050.
 
-- `npm run dev`: Vite frontend; run `npm start` in another terminal for the API.
-- `npm run build`: build frontend files into `dist`.
-- `npm run preview`: preview that build with the API server running on port 5050.
+## Deploy on Render
+
+Create a Render Web Service from this repository with the project folder as its
+root, `npm install` as the build command, and `npm start` as the start command.
+Set `MONGODB_URI`, `AUTH_SECRET`, `WARDEN_USERNAME`, and `WARDEN_PASSWORD` in the
+Render service's Environment settings. In MongoDB Atlas, allow the Render
+service's outbound IP ranges in the cluster's network access list.
+
+The GitHub Actions workflow builds the frontend on pushes to `main`. To deploy
+through a Render deploy hook, add `RENDER_DEPLOY_HOOK_URL` as a GitHub Actions
+repository secret. If the Render service is already connected to GitHub with
+auto-deploy enabled, the hook secret is optional.
+
+## Scripts
+
+- `npm run build`: build frontend assets into `dist`.
 - `npm run lint`: check JavaScript.
-- `npm test`: API regression checks against the local `leave-management-test`
-  database (override with `TEST_MONGODB_URI`). Removes its own test user afterward.
-
-Login currently identifies a user by email only; no password authentication is implemented.
+- `npm test`: run API checks against `TEST_MONGODB_URI`, or the local
+  `leave-management-test` database by default. The test removes its test user.

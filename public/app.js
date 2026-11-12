@@ -1,370 +1,273 @@
-
-let userId = null;
-
-// Get HTML element
-function getElement(id) {
-    return document.getElementById(id);
-}
-
-// Display response messages
-function showMessage(message, id = "response-message") {
-    const element = getElement(id);
-
-    if (element) {
-        element.textContent = message;
-    }
-}
-
-// Show or hide HTML sections
-function toggleSection(id, show) {
-    const element = getElement(id);
-
-    if (element) {
-        element.style.display = show ? "block" : "none";
-    }
-}
-
-// Show login page
-function showLogin() {
-    toggleSection("login-section", true);
-    toggleSection("registration-section", false);
-}
-
-// Show registration page
-function showRegistration() {
-    toggleSection("registration-section", true);
-    toggleSection("login-section", false);
-}
-
-// Send API request
+const byId = (id) => document.getElementById(id);
+let selectedApplication = null;
+let searchTimer;
 
 async function apiRequest(url, options = {}) {
-    const response = await fetch(url, options);
-    const responseText = await response.text();
-
-    let data = {};
-
-    if (responseText.trim()) {
-        try {
-            data = JSON.parse(responseText);
-        } catch {
-            console.error(
-                "Invalid response from server:",
-                responseText
-            );
-
-            throw new Error(
-                "The server returned an invalid response. Check the API URL."
-            );
-        }
-    }
-
-    if (!response.ok) {
-        throw new Error(
-            data.message || `Request failed (${response.status})`
-        );
-    }
-
-    if (!responseText.trim()) {
-        throw new Error(
-            "The server returned an empty response. Check the backend route."
-        );
-    }
-
-    return data;
-}
-
-// Register new user
-async function registerUser(event) {
-    event.preventDefault();
-
-    const username = getElement("username").value.trim();
-    const email = getElement("reg-email").value.trim();
-    const rollNumber = getElement("roll-number").value.trim();
-
-    const casualLeave = Number(
-        getElement("casual-leave").value
-    );
-
-    const medicalLeave = Number(
-        getElement("medical-leave").value
-    );
-
-    if (!username || !email || !rollNumber) {
-        showMessage(
-            "Please fill all required fields",
-            "registration-response"
-        );
-        return;
-    }
-
-    if (
-        !Number.isInteger(casualLeave) ||
-        casualLeave < 0 ||
-        !Number.isInteger(medicalLeave) ||
-        medicalLeave < 0
-    ) {
-        showMessage(
-            "Leave balances must be non-negative whole numbers",
-            "registration-response"
-        );
-        return;
-    }
-
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    ...options,
+    headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers },
+  });
+  const text = await response.text();
+  let data = {};
+  if (text) {
     try {
-        const data = await apiRequest("/api/register", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                username,
-                email,
-                rollNumber,
-                casualLeave,
-                medicalLeave
-            })
-        });
-
-        showMessage(
-            data.message,
-            "registration-response"
-        );
-
-        getElement("registration-form").reset();
-
-        showLogin();
-
-        showMessage("Registration successful. Please login.");
-
-    } catch (error) {
-        console.error("Registration error:", error);
-
-        showMessage(
-            error.message,
-            "registration-response"
-        );
+      data = JSON.parse(text);
+    } catch {
+      throw new Error("The server returned an invalid response.");
     }
+  }
+  if (!response.ok) throw new Error(data.message || `Request failed (${response.status})`);
+  return data;
 }
 
-// Login user
-async function loginUser(event) {
-    event.preventDefault();
-
-    const email = getElement("email").value.trim();
-
-    if (!email) {
-        showMessage("Please enter your email");
-        return;
-    }
-
-    try {
-        const data = await apiRequest("/api/login", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ email })
-        });
-
-        userId = data.userId;
-
-        getElement("username-display").textContent =
-            data.username;
-
-        getElement("roll-number-display").textContent =
-            data.rollNumber;
-
-        getElement("casual-leave-display").textContent =
-            data.casualLeave;
-
-        getElement("medical-leave-display").textContent =
-            data.medicalLeave;
-
-        toggleSection("login-section", false);
-        toggleSection("registration-section", false);
-        toggleSection("balance-section", true);
-        toggleSection("apply-leave-section", true);
-        toggleSection("logout-button", true);
-
-        showMessage("Login successful");
-
-    } catch (error) {
-        console.error("Login error:", error);
-        showMessage(error.message);
-    }
+function showMessage(message, isError = false) {
+  const element = byId("response-message");
+  element.textContent = message;
+  element.classList.toggle("error", isError);
 }
 
-// Logout user
-function logoutUser() {
-    userId = null;
+function showAuthPanel(panel) {
+  byId("student-login-panel").hidden = panel !== "student";
+  byId("warden-login-panel").hidden = panel !== "warden";
+  byId("registration-panel").hidden = panel !== "registration";
+  byId("auth-title").textContent = panel === "registration"
+    ? "Create your student account"
+    : panel === "warden" ? "Warden sign in" : "Sign in to your account";
+  byId("auth-description").hidden = panel === "registration";
+  showMessage("");
+}
 
-    toggleSection("balance-section", false);
-    toggleSection("apply-leave-section", false);
-    toggleSection("logout-button", false);
-    toggleSection("registration-section", false);
+function showDashboard(user) {
+  byId("auth-view").hidden = true;
+  byId("student-dashboard").hidden = user.role !== "student";
+  byId("warden-dashboard").hidden = user.role !== "warden";
+  if (user.role === "student") {
+    byId("profile-name").textContent = user.username;
+    byId("profile-register-number").textContent = user.rollNumber;
+    byId("profile-department").textContent = user.department;
+    byId("profile-email").textContent = user.email;
+    byId("casual-leave-balance").textContent = user.casualLeave;
+    byId("medical-leave-balance").textContent = user.medicalLeave;
+    loadStudentLeaves();
+  } else {
+    loadWardenApplications();
+  }
+}
 
-    getElement("username-display").textContent = "";
-    getElement("roll-number-display").textContent = "";
+function showLogin() {
+  byId("auth-view").hidden = false;
+  byId("student-dashboard").hidden = true;
+  byId("warden-dashboard").hidden = true;
+  showAuthPanel("student");
+}
 
-    getElement("casual-leave-display").textContent = "0";
-    getElement("medical-leave-display").textContent = "0";
+async function submitLogin(event, endpoint) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const body = Object.fromEntries(new FormData(form));
+  try {
+    const result = await apiRequest(endpoint, { method: "POST", body: JSON.stringify(body) });
+    showDashboard(result.user);
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+}
 
-    getElement("login-form").reset();
+async function registerStudent(event) {
+  event.preventDefault();
+  const body = Object.fromEntries(new FormData(event.currentTarget));
+  try {
+    const result = await apiRequest("/api/auth/register", { method: "POST", body: JSON.stringify(body) });
+    event.currentTarget.reset();
+    showAuthPanel("student");
+    showMessage(result.message);
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+}
 
+function formatDate(value) {
+  return new Date(value).toLocaleDateString();
+}
+
+function addTextCell(row, value) {
+  const cell = document.createElement("td");
+  cell.textContent = value;
+  row.append(cell);
+  return cell;
+}
+
+async function loadStudentLeaves() {
+  try {
+    const result = await apiRequest("/api/student/leaves");
+    const list = byId("student-leave-list");
+    list.replaceChildren();
+    if (!result.applications.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "No leave applications yet.";
+      list.append(empty);
+      return;
+    }
+    for (const application of result.applications) {
+      const card = document.createElement("article");
+      card.className = "application-card";
+      const title = document.createElement("h3");
+      title.textContent = `${application.leaveType} leave · ${application.days} day${application.days === 1 ? "" : "s"}`;
+      const dates = document.createElement("p");
+      dates.textContent = `${formatDate(application.fromDate)} – ${formatDate(application.toDate)}`;
+      const status = document.createElement("p");
+      status.className = `status status-${application.status}`;
+      status.textContent = application.status;
+      const reason = document.createElement("p");
+      reason.textContent = application.reason;
+      card.append(title, dates, status, reason);
+      if (application.remarks) {
+        const remarks = document.createElement("p");
+        remarks.textContent = `Warden remarks: ${application.remarks}`;
+        card.append(remarks);
+      }
+      list.append(card);
+    }
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+}
+
+async function loadWardenApplications() {
+  const query = new URLSearchParams();
+  const status = byId("status-filter").value;
+  const search = byId("application-search").value.trim();
+  if (status) query.set("status", status);
+  if (search) query.set("search", search);
+  try {
+    const result = await apiRequest(`/api/warden/leaves?${query}`);
+    for (const key of ["total", "pending", "approved", "rejected"]) {
+      byId(`stat-${key}`).textContent = result.stats[key];
+    }
+    const rows = byId("warden-application-rows");
+    rows.replaceChildren();
+    if (!result.applications.length) {
+      const row = document.createElement("tr");
+      const cell = addTextCell(row, "No applications found.");
+      cell.colSpan = 8;
+      cell.className = "muted";
+      rows.append(row);
+      return;
+    }
+    for (const application of result.applications) {
+      const row = document.createElement("tr");
+      addTextCell(row, application.student.name);
+      addTextCell(row, application.student.registerNumber);
+      addTextCell(row, application.student.department);
+      addTextCell(row, `${application.leaveType} (${application.days} days)`);
+      addTextCell(row, `${formatDate(application.fromDate)} – ${formatDate(application.toDate)}`);
+      addTextCell(row, formatDate(application.submittedAt));
+      const statusCell = addTextCell(row, application.status);
+      statusCell.className = `status status-${application.status}`;
+      const actionCell = document.createElement("td");
+      const viewButton = document.createElement("button");
+      viewButton.type = "button";
+      viewButton.className = "link-btn";
+      viewButton.textContent = "View";
+      viewButton.addEventListener("click", () => openApplication(application));
+      actionCell.append(viewButton);
+      row.append(actionCell);
+      rows.append(row);
+    }
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+}
+
+function openApplication(application) {
+  selectedApplication = application;
+  const details = byId("application-details");
+  details.replaceChildren();
+  const values = [
+    ["Student", application.student.name],
+    ["Register number", application.student.registerNumber],
+    ["Department", application.student.department],
+    ["Leave type", application.leaveType],
+    ["Dates", `${formatDate(application.fromDate)} – ${formatDate(application.toDate)}`],
+    ["Reason", application.reason],
+    ["Status", application.status],
+  ];
+  for (const [label, value] of values) {
+    const line = document.createElement("p");
+    const heading = document.createElement("strong");
+    heading.textContent = `${label}: `;
+    line.append(heading, document.createTextNode(value));
+    details.append(line);
+  }
+  byId("review-form").hidden = application.status !== "pending";
+  byId("review-remarks").value = "";
+  byId("application-dialog").showModal();
+}
+
+async function reviewApplication(status) {
+  if (!selectedApplication) return;
+  try {
+    const remarks = byId("review-remarks").value.trim();
+    const result = await apiRequest(`/api/warden/leaves/${selectedApplication.id}/review`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, remarks }),
+    });
+    byId("application-dialog").close();
+    showMessage(result.message);
+    await loadWardenApplications();
+  } catch (error) {
+    showMessage(error.message, true);
+  }
+}
+
+async function logout() {
+  try {
+    await apiRequest("/api/auth/logout", { method: "POST" });
+  } catch (error) {
+    console.error("Logout error:", error);
+  } finally {
     showLogin();
-
-    showMessage("Logged out successfully");
+  }
 }
 
-// Refresh leave balance
-async function refreshLeaveBalance() {
-    if (!userId) {
-        showMessage("Please login first");
-        return;
-    }
-
-    try {
-        const data = await apiRequest(
-            `/api/leave-balance/${userId}`
-        );
-
-        getElement("casual-leave-display").textContent =
-            data.casualLeave;
-
-        getElement("medical-leave-display").textContent =
-            data.medicalLeave;
-
-        showMessage("Leave balance updated");
-
-    } catch (error) {
-        console.error("Balance error:", error);
-        showMessage(error.message);
-    }
+async function restoreSession() {
+  try {
+    const result = await apiRequest("/api/auth/me");
+    showDashboard(result.user);
+  } catch {
+    showLogin();
+  }
 }
 
-// Apply for leave
-async function applyLeave(event) {
-    event.preventDefault();
-
-    if (!userId) {
-        showMessage("Please login first");
-        return;
-    }
-
-    const type = getElement("leave-type").value;
-
-    const days = Number(
-        getElement("leave-days").value
-    );
-
-    if (!Number.isInteger(days) || days <= 0) {
-        showMessage("Enter a valid number of days");
-        return;
-    }
-
-    if (type !== "casual" && type !== "medical") {
-        showMessage("Please select a valid leave type");
-        return;
-    }
-
-    try {
-        const data = await apiRequest(
-            `/api/apply-leave/${userId}`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    type,
-                    days
-                })
-            }
-        );
-
-        getElement("casual-leave-display").textContent =
-            data.casualLeave;
-
-        getElement("medical-leave-display").textContent =
-            data.medicalLeave;
-
-        showMessage(data.message);
-
-        getElement("leave-form").reset();
-
-    } catch (error) {
-        console.error("Apply leave error:", error);
-        showMessage(error.message);
-    }
-}
-
-// Initialize application
-document.addEventListener("DOMContentLoaded", () => {
-
-    function addListener(id, event, handler) {
-        const element = getElement(id);
-
-        if (element) {
-            element.addEventListener(event, handler);
-        } else {
-            console.error(`Missing HTML element: ${id}`);
-        }
-    }
-
-    // Registration
-    addListener(
-        "registration-form",
-        "submit",
-        registerUser
-    );
-
-    // Login
-    addListener(
-        "login-form",
-        "submit",
-        loginUser
-    );
-
-    // Logout
-    addListener(
-        "logout-button",
-        "click",
-        logoutUser
-    );
-
-    // Refresh balance
-    addListener(
-        "refresh-balance",
-        "click",
-        refreshLeaveBalance
-    );
-
-    // Apply leave
-    addListener(
-        "leave-form",
-        "submit",
-        applyLeave
-    );
-
-    // Navigation
-    addListener(
-        "show-login",
-        "click",
-        showLogin
-    );
-
-    addListener(
-        "show-registration",
-        "click",
-        showRegistration
-    );
-
-    // Initial display
-    toggleSection("login-section", true);
-    toggleSection("registration-section", false);
-    toggleSection("balance-section", false);
-    toggleSection("apply-leave-section", false);
-    toggleSection("logout-button", false);
-
+byId("student-login-form").addEventListener("submit", (event) => submitLogin(event, "/api/auth/login"));
+byId("warden-login-form").addEventListener("submit", (event) => submitLogin(event, "/api/auth/warden/login"));
+byId("registration-form").addEventListener("submit", registerStudent);
+byId("show-registration").addEventListener("click", () => showAuthPanel("registration"));
+byId("show-login").addEventListener("click", () => showAuthPanel("student"));
+byId("show-warden-login").addEventListener("click", () => showAuthPanel("warden"));
+byId("show-student-login").addEventListener("click", () => showAuthPanel("student"));
+document.querySelectorAll(".logout-button").forEach((button) => button.addEventListener("click", logout));
+byId("leave-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = Object.fromEntries(new FormData(event.currentTarget));
+  try {
+    const result = await apiRequest("/api/student/leaves", { method: "POST", body: JSON.stringify(body) });
+    showMessage(result.message);
+    event.currentTarget.reset();
+    await loadStudentLeaves();
+  } catch (error) {
+    showMessage(error.message, true);
+  }
 });
+byId("refresh-history").addEventListener("click", loadStudentLeaves);
+byId("status-filter").addEventListener("change", loadWardenApplications);
+byId("application-search").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadWardenApplications, 200);
+});
+byId("approve-application").addEventListener("click", () => reviewApplication("approved"));
+byId("reject-application").addEventListener("click", () => reviewApplication("rejected"));
+byId("close-application-dialog").addEventListener("click", () => byId("application-dialog").close());
+restoreSession();

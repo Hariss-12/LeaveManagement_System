@@ -3,14 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "start": "node app.js",
-    "server": "node app.js",
+    "start": "node --env-file-if-exists=.env app.js",
+    "server": "node --env-file-if-exists=.env app.js",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --test tests/api.test.js"
+    "test": "node --env-file-if-exists=.env --test tests/api.test.js"
   },
   "dependencies": {
     "body-parser": "^2.3.0",

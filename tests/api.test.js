@@ -1,57 +1,83 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const mongoose = require('mongoose');
-const app = require('../app');
-const User = require('../models/user');
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+const mongoose = require("mongoose");
 
-test('registration, login, validation, and atomic leave deductions', async () => {
-    await mongoose.connect(process.env.TEST_MONGODB_URI || 'mongodb://127.0.0.1:27017/leave-management-test', { serverSelectionTimeoutMS: 5000 });
-    const email = `regression-${Date.now()}@example.com`;
-    let server;
-    try {
-        await User.init();
-        server = app.listen(0, '127.0.0.1');
-        await new Promise(resolve => server.once('listening', resolve));
-        const base = `http://127.0.0.1:${server.address().port}`;
-        const request = async (path, body) => {
-            const response = await fetch(base + path, body === undefined ? {} : {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-            });
-            return { status: response.status, body: await response.json() };
-        };
-        assert.equal((await fetch(base)).status, 200);
-        assert.equal((await fetch(base + '/style.css')).status, 200);
-        const registration = { username: 'Regression User', email, rollNumber: 'TEST', casualLeave: 10, medicalLeave: 5 };
-        for (const balance of [-1, 1.5, '10', null]) {
-            assert.equal((await request('/api/register', { ...registration, casualLeave: balance })).status, 400);
-        }
-        assert.equal((await request('/api/register', {})).status, 400);
-        const registered = await request('/api/register', registration);
-        assert.equal(registered.status, 201);
-        const id = registered.body.userId;
-        assert.equal((await request('/api/register', registration)).status, 409);
-        assert.equal((await request('/api/login', { email: email.toUpperCase() })).body.userId, id);
-        assert.equal((await request('/api/leave-balance/invalid')).status, 400);
-        assert.equal((await request(`/api/leave-balance/${new mongoose.Types.ObjectId()}`)).status, 404);
-        for (const days of [0, -1, 1.5, true, '2']) {
-            assert.equal((await request(`/api/apply-leave/${id}`, { type: 'casual', days })).status, 400);
-        }
-        assert.equal((await request(`/api/apply-leave/${id}`, { type: 'other', days: 1 })).status, 400);
-        const applied = await request(`/api/apply-leave/${id}`, { type: 'casual', days: 3 });
-        assert.equal(applied.body.casualLeave, 7);
-        assert.equal(applied.body.medicalLeave, 5);
-        assert.equal((await request(`/api/apply-leave/${id}`, { type: 'casual', days: 8 })).status, 400);
-        const concurrent = await Promise.all([1, 2].map(() => request(`/api/apply-leave/${id}`, { type: 'casual', days: 5 })));
-        assert.deepEqual(concurrent.map(result => result.status).sort(), [200, 400]);
-        assert.equal((await request(`/api/apply-leave/${id}`, { type: 'medical', days: 2 })).body.medicalLeave, 3);
-        assert.deepEqual((await request(`/api/leave-balance/${id}`)).body, { casualLeave: 2, medicalLeave: 3 });
-        const malformed = await fetch(base + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' });
-        assert.equal(malformed.status, 400);
-        assert.equal((await malformed.json()).message, 'Invalid JSON request');
-        console.log('Verified: 10 casual days - 3 requested days = 7 remaining days.');
-    } finally {
-        await User.deleteMany({ email });
-        if (server) await new Promise(resolve => server.close(resolve));
-        await mongoose.disconnect();
-    }
+process.env.AUTH_SECRET ||= "api-test-secret-that-is-at-least-thirty-two-characters";
+process.env.WARDEN_USERNAME ||= "test-warden";
+process.env.WARDEN_PASSWORD ||= "test-warden-password";
+
+const app = require("../app");
+const User = require("../models/user");
+const LeaveApplication = require("../models/leaveApplication");
+
+test("registration, sessions, leave requests, and warden review", async () => {
+  const mongoUri = process.env.TEST_MONGODB_URI || "mongodb://127.0.0.1:27017/leave-management-test";
+  await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
+  const stamp = Date.now();
+  const email = `regression-${stamp}@example.com`;
+  const rollNumber = `TEST-${stamp}`;
+  let server;
+
+  const request = async (base, path, body, cookie) => {
+    const response = await fetch(base + path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: {
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(cookie ? { Cookie: cookie } : {}),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    return { status: response.status, body: await response.json(), cookie: response.headers.get("set-cookie")?.split(";")[0] };
+  };
+
+  try {
+    await User.init();
+    server = app.listen(0, "127.0.0.1");
+    await new Promise((resolve) => server.once("listening", resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+
+    assert.equal((await fetch(base)).status, 200);
+    assert.equal((await fetch(`${base}/style.css`)).status, 200);
+    assert.equal((await fetch(`${base}/api/health`)).status, 200);
+
+    const registration = { username: "Regression User", email, rollNumber, department: "Testing", password: "safe-test-password" };
+    assert.equal((await request(base, "/api/auth/register", {})).status, 400);
+    assert.equal((await request(base, "/api/auth/register", registration)).status, 201);
+    assert.equal((await request(base, "/api/auth/register", registration)).status, 409);
+
+    const login = await request(base, "/api/auth/login", { email: email.toUpperCase(), password: registration.password });
+    assert.equal(login.status, 200);
+    assert.ok(login.cookie);
+    assert.equal((await request(base, "/api/auth/me", undefined, login.cookie)).body.user.email, email);
+
+    const leaveDate = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+    const leave = await request(base, "/api/student/leaves", {
+      leaveType: "casual", fromDate: leaveDate, toDate: leaveDate, reason: "Personal appointment",
+    }, login.cookie);
+    assert.equal(leave.status, 201);
+    assert.equal(leave.body.application.days, 1);
+    assert.equal((await request(base, "/api/student/leaves", undefined, login.cookie)).body.applications.length, 1);
+
+    const wardenLogin = await request(base, "/api/auth/warden/login", {
+      username: process.env.WARDEN_USERNAME, password: process.env.WARDEN_PASSWORD,
+    });
+    assert.equal(wardenLogin.status, 200);
+    const queue = await request(base, `/api/warden/leaves?search=${rollNumber}`, undefined, wardenLogin.cookie);
+    assert.equal(queue.status, 200);
+    assert.equal(queue.body.applications.length, 1);
+
+    const rejected = await fetch(`${base}/api/warden/leaves/${leave.body.application.id}/review`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: wardenLogin.cookie },
+      body: JSON.stringify({ status: "rejected", remarks: "Please submit updated dates." }),
+    });
+    assert.equal(rejected.status, 200);
+    assert.equal((await request(base, "/api/auth/logout", {}, login.cookie)).status, 200);
+  } finally {
+    const user = await User.findOne({ email }).select("_id");
+    if (user) await LeaveApplication.deleteMany({ student: user._id });
+    await User.deleteMany({ email });
+    if (server) await new Promise((resolve) => server.close(resolve));
+    await mongoose.disconnect();
+  }
 });
