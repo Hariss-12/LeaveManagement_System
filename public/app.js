@@ -1,4 +1,6 @@
 const byId = (id) => document.getElementById(id);
+const isGitHubPages = window.location.hostname === "github.io" ||
+  window.location.hostname.endsWith(".github.io");
 let selectedApplication = null;
 let searchTimer;
 
@@ -303,4 +305,15 @@ byId("application-search").addEventListener("input", () => {
 byId("approve-application").addEventListener("click", () => reviewApplication("approved"));
 byId("reject-application").addEventListener("click", () => reviewApplication("rejected"));
 byId("close-application-dialog").addEventListener("click", () => byId("application-dialog").close());
-restoreSession();
+
+if (isGitHubPages) {
+  if (window.location.search) {
+    window.history.replaceState(window.history.state, "", window.location.pathname + window.location.hash);
+  }
+  document.querySelectorAll("#auth-view input, #auth-view button").forEach((control) => {
+    control.disabled = true;
+  });
+  showMessage("GitHub Pages cannot run the leave-management API. Open the Render app URL to sign in.", true);
+} else {
+  restoreSession();
+}
