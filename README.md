@@ -21,7 +21,7 @@ Create a Render Web Service from this repository with the project folder as its 
 
 Set `MONGODB_URI`, `AUTH_SECRET`, `WARDEN_USERNAME`, and `WARDEN_PASSWORD` in the Render service's Environment settings. In MongoDB Atlas, allow the Render service's outbound IP ranges in the cluster's network access list.
 
-GitHub Pages can serve the static frontend but cannot run the Express API or MongoDB. Use the Render service URL to sign in and use the leave-management features.
+GitHub Pages can serve the static frontend but cannot run the Express API or MongoDB. Use the [live Render app](https://leavemanagement-system-1.onrender.com/) to sign in and use the leave-management features.
 
 The GitHub Actions workflow runs lint and API tests on pushes and pull requests. To trigger Render through the workflow, add `RENDER_DEPLOY_HOOK_URL` as a repository secret. If the secret is not set, the hook is skipped; enable Render's GitHub auto-deploy if you want Render to deploy without the hook.
 

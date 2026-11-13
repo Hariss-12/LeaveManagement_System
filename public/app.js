@@ -313,7 +313,13 @@ if (isGitHubPages) {
   document.querySelectorAll("#auth-view input, #auth-view button").forEach((control) => {
     control.disabled = true;
   });
-  showMessage("GitHub Pages cannot run the leave-management API. Open the Render app URL to sign in.", true);
+  const message = byId("response-message");
+  message.replaceChildren(document.createTextNode("GitHub Pages cannot run the leave-management API. "));
+  const renderLink = document.createElement("a");
+  renderLink.href = "https://leavemanagement-system-1.onrender.com/";
+  renderLink.textContent = "Sign in to the live app";
+  message.append(renderLink);
+  message.classList.add("error");
 } else {
   restoreSession();
 }
