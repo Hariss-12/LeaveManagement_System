@@ -60,14 +60,14 @@ router.patch("/warden/leaves/:id/review", wardenOnly, async (req, res) => {
   if (decision === "rejected" && !remarks) return res.status(400).json({ success: false, message: "Add a remark when rejecting an application" });
   if (remarks.length > 1000) return res.status(400).json({ success: false, message: "Remarks cannot exceed 1000 characters" });
   try {
-    const application = await LeaveApplication.findOneAndUpdate({ _id: req.params.id, status: "pending" }, { $set: { status: decision, remarks: decision === "rejected" ? remarks : "", reviewedBy: "Warden", reviewedAt: new Date() } }, { new: true });
+    const application = await LeaveApplication.findOneAndUpdate({ _id: req.params.id, status: "pending" }, { $set: { status: decision, remarks: decision === "rejected" ? remarks : "", reviewedBy: "Warden", reviewedAt: new Date() } }, { returnDocument: "after" });
     if (!application) {
       const exists = await LeaveApplication.exists({ _id: req.params.id });
       return exists ? res.status(409).json({ success: false, message: "This application has already been reviewed" }) : res.status(404).json({ success: false, message: "Application not found" });
     }
     if (decision === "approved") {
       const balanceField = application.leaveType === "casual" ? "casualLeave" : "medicalLeave";
-      const student = await User.findOneAndUpdate({ _id: application.student, [balanceField]: { $gte: application.days } }, { $inc: { [balanceField]: -application.days } }, { new: true });
+      const student = await User.findOneAndUpdate({ _id: application.student, [balanceField]: { $gte: application.days } }, { $inc: { [balanceField]: -application.days } }, { returnDocument: "after" });
       if (!student) {
         await LeaveApplication.updateOne({ _id: application._id, status: "approved" }, { $set: { status: "pending", reviewedBy: "", reviewedAt: null } });
         return res.status(409).json({ success: false, message: "Student does not have enough leave balance to approve this request" });
