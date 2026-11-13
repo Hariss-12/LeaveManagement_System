@@ -27,7 +27,7 @@
                     </div>
 
                     <section id="student-login-panel" class="auth-panel" aria-label="Student sign in">
-                        <form id="student-login-form" autocomplete="on">
+                        <form id="student-login-form" method="post" autocomplete="on">
                             <label for="student-login-email">College email</label>
                             <input id="student-login-email" name="email" type="email" autocomplete="email"
                                 placeholder="you@college.edu" required>
@@ -43,7 +43,7 @@
                     </section>
 
                     <section id="warden-login-panel" class="auth-panel" aria-label="Warden sign in" hidden>
-                        <form id="warden-login-form" autocomplete="on">
+                        <form id="warden-login-form" method="post" autocomplete="on">
                             <label for="warden-login-username">Warden username</label>
                             <input id="warden-login-username" name="username" type="text" autocomplete="username"
                                 required>
@@ -60,7 +60,7 @@
                     <section id="registration-panel" class="auth-panel" hidden>
                         <p class="eyebrow">STUDENT ACCOUNT</p>
                         <h2>Create your account</h2>
-                        <form id="registration-form" autocomplete="on">
+                        <form id="registration-form" method="post" autocomplete="on">
                             <label for="register-name">Full name</label>
                             <input id="register-name" name="username" type="text" autocomplete="name" maxlength="100"
                                 required>

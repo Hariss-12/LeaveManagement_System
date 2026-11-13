@@ -21,6 +21,8 @@ Create a Render Web Service from this repository with the project folder as its 
 
 Set `MONGODB_URI`, `AUTH_SECRET`, `WARDEN_USERNAME`, and `WARDEN_PASSWORD` in the Render service's Environment settings. In MongoDB Atlas, allow the Render service's outbound IP ranges in the cluster's network access list.
 
+The GitHub Actions workflow runs lint and API tests on pushes and pull requests. To trigger Render through the workflow, add `RENDER_DEPLOY_HOOK_URL` as a repository secret. If the secret is not set, the hook is skipped; enable Render's GitHub auto-deploy if you want Render to deploy without the hook.
+
 ## Scripts
 
 - `npm run lint`: check JavaScript.
