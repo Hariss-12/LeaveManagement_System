@@ -1,38 +1,93 @@
+
 name: Build and deploy
 
 on:
   push:
     branches:
       - main
+
+  pull_request:
+    branches:
+      - main
+
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: leave-management-deployment
+  cancel-in-progress: false
 
 jobs:
   build-and-deploy:
+    name: Test and deploy application
     runs-on: ubuntu-latest
-    env:
-      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+    timeout-minutes: 15
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
-      - name: Check out repository
+      # 1. Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      # 2. Setup Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
+      # 3. Install dependencies
       - name: Install dependencies
         run: npm ci
 
+      # 4. Lint application
       - name: Lint application
         run: npm run lint
 
-      - name: Trigger Render deployment
-        if: github.ref == 'refs/heads/main' && env.RENDER_DEPLOY_HOOK_URL != ''
-        run: |
-          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK_URL"
+      # 5. Run API tests
+      - name: Run API tests
+        env:
+          TEST_MONGODB_URI: mongodb://127.0.0.1:27017/leave-management-test
+          AUTH_SECRET: test-only-secret-with-at-least-32-characters
+          WARDEN_USERNAME: test-warden
+          WARDEN_PASSWORD: test-only-warden-password
+        run: npm test
 
-      - name: Skip webhook when Render auto-deploy is enabled
-        if: github.ref == 'refs/heads/main' && env.RENDER_DEPLOY_HOOK_URL == ''
-        run: echo "No Render deploy hook configured; Render can deploy directly from the connected GitHub repository."
+      # 6. Trigger Render deployment
+      - name: Trigger Render deployment
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret is missing."
+            exit 1
+          fi
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --request POST \
+            --retry 3 \
+            --retry-delay 5 \
+            --retry-all-errors \
+            --max-time 30 \
+            "$RENDER_DEPLOY_HOOK_URL"
+
+      # 7. Deployment notification
+      - name: Deployment notification
+        if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: echo "All checks passed. Render deployment was triggered successfully."
