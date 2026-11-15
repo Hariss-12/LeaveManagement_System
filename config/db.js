@@ -6,8 +6,7 @@ const isSrvDnsError = (error) =>
   /querySrv/i.test(error?.message || "") &&
   ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ETIMEOUT"].includes(error?.code);
 
-const connectDB = async () => {
-  const mongoUri = process.env.MONGODB_URI;
+const connectDB = async (mongoUri = process.env.MONGODB_URI, serverSelectionTimeoutMS = 15000) => {
 
   if (!mongoUri) {
     throw new Error("MONGODB_URI is required. Set it to your MongoDB connection string.");
@@ -19,7 +18,7 @@ const connectDB = async () => {
 
   const originalDnsServers = dns.getServers();
   try {
-    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 15000 });
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS });
     console.log("MongoDB connected successfully");
   } catch (error) {
     if (!/^mongodb\+srv:\/\//i.test(mongoUri) || !isSrvDnsError(error)) {
@@ -30,7 +29,7 @@ const connectDB = async () => {
     for (const dnsServer of fallbackDnsServers) {
       try {
         dns.setServers([dnsServer]);
-        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 15000 });
+        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS });
         console.warn(`MongoDB DNS lookup succeeded using fallback resolver ${dnsServer}`);
         console.log("MongoDB connected successfully");
         return;

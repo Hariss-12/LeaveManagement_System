@@ -6,6 +6,7 @@ let searchTimer;
 
 async function apiRequest(url, options = {}) {
   const response = await fetch(url, {
+    cache: "no-store",
     credentials: "same-origin",
     ...options,
     headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers },
@@ -30,6 +31,12 @@ async function apiRequest(url, options = {}) {
 
 function showMessage(message, isError = false) {
   const element = byId("response-message");
+  element.textContent = message;
+  element.classList.toggle("error", isError);
+}
+
+function showReviewMessage(message, isError = false) {
+  const element = byId("review-message");
   element.textContent = message;
   element.classList.toggle("error", isError);
 }
@@ -237,6 +244,7 @@ function openApplication(application) {
   }
   byId("review-form").hidden = application.status !== "pending";
   byId("review-remarks").value = "";
+  showReviewMessage("");
   byId("application-dialog").showModal();
 }
 
@@ -252,7 +260,7 @@ async function reviewApplication(status) {
     showMessage(result.message);
     await loadWardenApplications();
   } catch (error) {
-    showMessage(error.message, true);
+    showReviewMessage(error.message, true);
   }
 }
 

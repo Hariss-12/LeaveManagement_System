@@ -28,4 +28,4 @@ The GitHub Actions workflow runs lint and API tests on pushes and pull requests.
 ## Scripts
 
 - `npm run lint`: check JavaScript.
-- `npm test`: run API checks against `TEST_MONGODB_URI`, or the local `leave-management-test` database by default. The test removes its test user.
+- `npm test`: run API checks against `TEST_MONGODB_URI`, or the local `leave-management-test` database by default. MongoDB must be running; on Windows, start the `MongoDB` service from an elevated PowerShell with `Start-Service MongoDB`. The test removes its test user.

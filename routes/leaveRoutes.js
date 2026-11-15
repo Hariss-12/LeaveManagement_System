@@ -67,11 +67,7 @@ router.patch("/warden/leaves/:id/review", wardenOnly, async (req, res) => {
     }
     if (decision === "approved") {
       const balanceField = application.leaveType === "casual" ? "casualLeave" : "medicalLeave";
-      const student = await User.findOneAndUpdate({ _id: application.student, [balanceField]: { $gte: application.days } }, { $inc: { [balanceField]: -application.days } }, { returnDocument: "after" });
-      if (!student) {
-        await LeaveApplication.updateOne({ _id: application._id, status: "approved" }, { $set: { status: "pending", reviewedBy: "", reviewedAt: null } });
-        return res.status(409).json({ success: false, message: "Student does not have enough leave balance to approve this request" });
-      }
+      await User.findOneAndUpdate({ _id: application.student, [balanceField]: { $gte: application.days } }, { $inc: { [balanceField]: -application.days } }, { returnDocument: "after" });
     }
     return res.json({ success: true, message: `Application ${decision}`, application: studentView(application) });
   } catch (error) {

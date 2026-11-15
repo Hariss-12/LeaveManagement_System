@@ -1,6 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const mongoose = require("mongoose");
+const connectDB = require("../config/db");
 
 process.env.AUTH_SECRET ||= "api-test-secret-that-is-at-least-thirty-two-characters";
 process.env.WARDEN_USERNAME ||= "test-warden";
@@ -12,7 +13,7 @@ const LeaveApplication = require("../models/leaveApplication");
 
 test("registration, sessions, leave requests, and warden review", async () => {
   const mongoUri = process.env.TEST_MONGODB_URI || "mongodb://127.0.0.1:27017/leave-management-test";
-  await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
+  await connectDB(mongoUri, 5000);
   const stamp = Date.now();
   const email = `regression-${stamp}@example.com`;
   const rollNumber = `TEST-${stamp}`;
@@ -38,7 +39,9 @@ test("registration, sessions, leave requests, and warden review", async () => {
 
     assert.equal((await fetch(base)).status, 200);
     assert.equal((await fetch(`${base}/style.css`)).status, 200);
-    assert.equal((await fetch(`${base}/api/health`)).status, 200);
+    const health = await fetch(`${base}/api/health`);
+    assert.equal(health.status, 200);
+    assert.equal(health.headers.get("cache-control"), "no-store");
 
     const registration = { username: "Regression User", email, rollNumber, department: "Testing", password: "safe-test-password" };
     assert.equal((await request(base, "/api/auth/register", {})).status, 400);
@@ -72,6 +75,29 @@ test("registration, sessions, leave requests, and warden review", async () => {
       body: JSON.stringify({ status: "rejected", remarks: "Please submit updated dates." }),
     });
     assert.equal(rejected.status, 200);
+    const secondLeave = await request(base, "/api/student/leaves", {
+      leaveType: "medical", fromDate: leaveDate, toDate: leaveDate, reason: "Medical appointment",
+    }, login.cookie);
+    assert.equal(secondLeave.status, 201);
+    const approved = await fetch(`${base}/api/warden/leaves/${secondLeave.body.application.id}/review`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: wardenLogin.cookie },
+      body: JSON.stringify({ status: "approved" }),
+    });
+    assert.equal(approved.status, 200);
+    assert.equal((await approved.json()).application.status, "approved");
+    assert.equal((await User.findOne({ email }).select("medicalLeave")).medicalLeave, 0);
+    await User.updateOne({ email }, { $set: { medicalLeave: 2 } });
+    const thirdLeave = await request(base, "/api/student/leaves", {
+      leaveType: "medical", fromDate: leaveDate, toDate: leaveDate, reason: "Follow-up appointment",
+    }, login.cookie);
+    const approvedWithBalance = await fetch(`${base}/api/warden/leaves/${thirdLeave.body.application.id}/review`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: wardenLogin.cookie },
+      body: JSON.stringify({ status: "approved" }),
+    });
+    assert.equal(approvedWithBalance.status, 200);
+    assert.equal((await User.findOne({ email }).select("medicalLeave")).medicalLeave, 1);
     assert.equal((await request(base, "/api/auth/logout", {}, login.cookie)).status, 200);
   } finally {
     const user = await User.findOne({ email }).select("_id");
