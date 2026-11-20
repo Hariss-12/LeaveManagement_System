@@ -33,25 +33,6 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, select: false },
     role: { type: String, enum: ["student"], default: "student" },
 
-    casualLeave: {
-      type: Number,
-      default: 0,
-      min: [0, "Casual leave cannot be negative"],
-      validate: {
-        validator: Number.isSafeInteger,
-        message: "Casual leave must be a whole number",
-      },
-    },
-
-    medicalLeave: {
-      type: Number,
-      default: 0,
-      min: [0, "Medical leave cannot be negative"],
-      validate: {
-        validator: Number.isSafeInteger,
-        message: "Medical leave must be a whole number",
-      },
-    },
   },
   {
     timestamps: true,

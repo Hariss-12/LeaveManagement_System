@@ -65,8 +65,6 @@ function showDashboard(user) {
     byId("profile-register-number").textContent = user.rollNumber;
     byId("profile-department").textContent = user.department;
     byId("profile-email").textContent = user.email;
-    byId("casual-leave-balance").textContent = user.casualLeave;
-    byId("medical-leave-balance").textContent = user.medicalLeave;
     loadStudentLeaves();
   } else {
     loadWardenApplications();
@@ -142,6 +140,11 @@ function addTextCell(row, value) {
 async function loadStudentLeaves() {
   try {
     const result = await apiRequest("/api/student/leaves");
+    for (const type of ["casual", "medical"]) {
+      const balance = result.balances[type];
+      byId(`${type}-leave-balance`).textContent = balance.remaining;
+      byId(`${type}-leave-used`).textContent = `${balance.used} of ${balance.total} days used · ${balance.pending} pending`;
+    }
     const list = byId("student-leave-list");
     list.replaceChildren();
     if (!result.applications.length) {

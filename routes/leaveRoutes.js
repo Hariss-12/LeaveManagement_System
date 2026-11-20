@@ -1,6 +1,5 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const User = require("../models/user");
 const LeaveApplication = require("../models/leaveApplication");
 const { requireAuth } = require("../middleware/auth");
 
@@ -8,9 +7,27 @@ const router = express.Router();
 const studentOnly = requireAuth("student");
 const wardenOnly = requireAuth("warden");
 const dayMs = 24 * 60 * 60 * 1000;
+const leaveEntitlements = { casual: 6, medical: 10 };
 const clean = (value) => typeof value === "string" ? value.trim() : "";
 const asDay = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value || "") ? new Date(`${value}T00:00:00.000Z`) : null;
 const studentView = (leave) => ({ id: leave._id, leaveType: leave.leaveType, fromDate: leave.fromDate, toDate: leave.toDate, days: leave.days, reason: leave.reason, status: leave.status, remarks: leave.remarks, submittedAt: leave.createdAt, reviewedAt: leave.reviewedAt });
+
+async function getLeaveBalances(studentId) {
+  const usage = await LeaveApplication.aggregate([
+    { $match: { student: new mongoose.Types.ObjectId(studentId), status: { $in: ["approved", "pending"] } } },
+    { $group: { _id: { leaveType: "$leaveType", status: "$status" }, days: { $sum: "$days" } } },
+  ]);
+  const usageByType = { casual: { used: 0, pending: 0 }, medical: { used: 0, pending: 0 } };
+  for (const { _id, days } of usage) {
+    usageByType[_id.leaveType][_id.status === "approved" ? "used" : "pending"] = days;
+  }
+  return Object.fromEntries(Object.entries(leaveEntitlements).map(([type, total]) => {
+    const { used, pending } = usageByType[type];
+    // Pending requests reserve leave so the displayed available balance matches
+    // the applications and students cannot request the same days twice.
+    return [type, { total, used, pending, remaining: Math.max(0, total - used - pending) }];
+  }));
+}
 
 router.post("/student/leaves", studentOnly, async (req, res) => {
   try {
@@ -23,6 +40,8 @@ router.post("/student/leaves", studentOnly, async (req, res) => {
     if (!["casual", "medical"].includes(leaveType)) return res.status(400).json({ success: false, message: "Choose a valid leave type" });
     if (reason.length < 5 || reason.length > 1000) return res.status(400).json({ success: false, message: "Reason must be between 5 and 1000 characters" });
     const days = Math.round((toDate - fromDate) / dayMs) + 1;
+    const balances = await getLeaveBalances(req.auth.sub);
+    if (days > balances[leaveType].remaining) return res.status(409).json({ success: false, message: `Not enough ${leaveType} leave remaining` });
     const leave = await LeaveApplication.create({ student: req.auth.sub, leaveType, fromDate, toDate, days, reason });
     return res.status(201).json({ success: true, message: "Leave request submitted for review", application: studentView(leave) });
   } catch (error) {
@@ -32,8 +51,16 @@ router.post("/student/leaves", studentOnly, async (req, res) => {
 });
 
 router.get("/student/leaves", studentOnly, async (req, res) => {
-  const leaves = await LeaveApplication.find({ student: req.auth.sub }).sort({ createdAt: -1 }).lean();
-  return res.json({ success: true, applications: leaves.map(studentView) });
+  try {
+    const [leaves, balances] = await Promise.all([
+      LeaveApplication.find({ student: req.auth.sub }).sort({ createdAt: -1 }).lean(),
+      getLeaveBalances(req.auth.sub),
+    ]);
+    return res.json({ success: true, applications: leaves.map(studentView), balances });
+  } catch (error) {
+    console.error("Student applications error:", error);
+    return res.status(500).json({ success: false, message: "Unable to load leave applications" });
+  }
 });
 
 router.get("/warden/leaves", wardenOnly, async (req, res) => {
@@ -60,14 +87,23 @@ router.patch("/warden/leaves/:id/review", wardenOnly, async (req, res) => {
   if (decision === "rejected" && !remarks) return res.status(400).json({ success: false, message: "Add a remark when rejecting an application" });
   if (remarks.length > 1000) return res.status(400).json({ success: false, message: "Remarks cannot exceed 1000 characters" });
   try {
-    const application = await LeaveApplication.findOneAndUpdate({ _id: req.params.id, status: "pending" }, { $set: { status: decision, remarks: decision === "rejected" ? remarks : "", reviewedBy: "Warden", reviewedAt: new Date() } }, { returnDocument: "after" });
-    if (!application) {
+    const pendingApplication = await LeaveApplication.findOne({ _id: req.params.id, status: "pending" });
+    if (!pendingApplication) {
       const exists = await LeaveApplication.exists({ _id: req.params.id });
       return exists ? res.status(409).json({ success: false, message: "This application has already been reviewed" }) : res.status(404).json({ success: false, message: "Application not found" });
     }
     if (decision === "approved") {
-      const balanceField = application.leaveType === "casual" ? "casualLeave" : "medicalLeave";
-      await User.findOneAndUpdate({ _id: application.student, [balanceField]: { $gte: application.days } }, { $inc: { [balanceField]: -application.days } }, { returnDocument: "after" });
+      const balances = await getLeaveBalances(pendingApplication.student);
+      // This request already reserves its days while pending. Approval changes
+      // its bucket from pending to used, so only approved days constrain it.
+      if (pendingApplication.days > balances[pendingApplication.leaveType].total - balances[pendingApplication.leaveType].used) {
+        return res.status(409).json({ success: false, message: `Not enough ${pendingApplication.leaveType} leave remaining` });
+      }
+    }
+    const application = await LeaveApplication.findOneAndUpdate({ _id: req.params.id, status: "pending" }, { $set: { status: decision, remarks: decision === "rejected" ? remarks : "", reviewedBy: "Warden", reviewedAt: new Date() } }, { returnDocument: "after" });
+    if (!application) {
+      const exists = await LeaveApplication.exists({ _id: req.params.id });
+      return exists ? res.status(409).json({ success: false, message: "This application has already been reviewed" }) : res.status(404).json({ success: false, message: "Application not found" });
     }
     return res.json({ success: true, message: `Application ${decision}`, application: studentView(application) });
   } catch (error) {

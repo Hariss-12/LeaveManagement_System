@@ -19,7 +19,7 @@ const verifyPassword = async (password, encoded) => {
   const actual = await scrypt(password, salt, expected.length);
   return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 };
-const publicUser = (user) => ({ userId: user._id, username: user.username, email: user.email, rollNumber: user.rollNumber, department: user.department, casualLeave: user.casualLeave, medicalLeave: user.medicalLeave, role: "student" });
+const publicUser = (user) => ({ userId: user._id, username: user.username, email: user.email, rollNumber: user.rollNumber, department: user.department, role: "student" });
 const tokenConfigured = () => Boolean(process.env.AUTH_SECRET && process.env.AUTH_SECRET.length >= 32);
 
 router.post("/register", async (req, res) => {

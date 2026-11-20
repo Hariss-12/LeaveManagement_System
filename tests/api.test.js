@@ -52,6 +52,11 @@ test("registration, sessions, leave requests, and warden review", async () => {
     assert.equal(login.status, 200);
     assert.ok(login.cookie);
     assert.equal((await request(base, "/api/auth/me", undefined, login.cookie)).body.user.email, email);
+    const initialBalances = (await request(base, "/api/student/leaves", undefined, login.cookie)).body.balances;
+    assert.deepEqual(initialBalances, {
+      casual: { total: 6, used: 0, pending: 0, remaining: 6 },
+      medical: { total: 10, used: 0, pending: 0, remaining: 10 },
+    });
 
     const leaveDate = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
     const leave = await request(base, "/api/student/leaves", {
@@ -59,7 +64,10 @@ test("registration, sessions, leave requests, and warden review", async () => {
     }, login.cookie);
     assert.equal(leave.status, 201);
     assert.equal(leave.body.application.days, 1);
-    assert.equal((await request(base, "/api/student/leaves", undefined, login.cookie)).body.applications.length, 1);
+    const leavesWithPendingCasual = await request(base, "/api/student/leaves", undefined, login.cookie);
+    assert.equal(leavesWithPendingCasual.body.applications.length, 1);
+    assert.equal(leavesWithPendingCasual.body.balances.casual.pending, 1);
+    assert.equal(leavesWithPendingCasual.body.balances.casual.remaining, 5);
 
     const wardenLogin = await request(base, "/api/auth/warden/login", {
       username: process.env.WARDEN_USERNAME, password: process.env.WARDEN_PASSWORD,
@@ -75,6 +83,8 @@ test("registration, sessions, leave requests, and warden review", async () => {
       body: JSON.stringify({ status: "rejected", remarks: "Please submit updated dates." }),
     });
     assert.equal(rejected.status, 200);
+    const balancesAfterRejection = (await request(base, "/api/student/leaves", undefined, login.cookie)).body.balances;
+    assert.equal(balancesAfterRejection.casual.pending, 0);
     const secondLeave = await request(base, "/api/student/leaves", {
       leaveType: "medical", fromDate: leaveDate, toDate: leaveDate, reason: "Medical appointment",
     }, login.cookie);
@@ -86,8 +96,9 @@ test("registration, sessions, leave requests, and warden review", async () => {
     });
     assert.equal(approved.status, 200);
     assert.equal((await approved.json()).application.status, "approved");
-    assert.equal((await User.findOne({ email }).select("medicalLeave")).medicalLeave, 0);
-    await User.updateOne({ email }, { $set: { medicalLeave: 2 } });
+    const balancesAfterApproval = (await request(base, "/api/student/leaves", undefined, login.cookie)).body.balances;
+    assert.equal(balancesAfterApproval.medical.used, 1);
+    assert.equal(balancesAfterApproval.medical.remaining, 9);
     const thirdLeave = await request(base, "/api/student/leaves", {
       leaveType: "medical", fromDate: leaveDate, toDate: leaveDate, reason: "Follow-up appointment",
     }, login.cookie);
@@ -97,7 +108,19 @@ test("registration, sessions, leave requests, and warden review", async () => {
       body: JSON.stringify({ status: "approved" }),
     });
     assert.equal(approvedWithBalance.status, 200);
-    assert.equal((await User.findOne({ email }).select("medicalLeave")).medicalLeave, 1);
+    const balancesAfterSecondApproval = (await request(base, "/api/student/leaves", undefined, login.cookie)).body.balances;
+    assert.equal(balancesAfterSecondApproval.medical.used, 2);
+    assert.equal(balancesAfterSecondApproval.medical.remaining, 8);
+    const overLimitLeave = await request(base, "/api/student/leaves", {
+      leaveType: "medical",
+      fromDate: leaveDate,
+      toDate: new Date(Date.parse(`${leaveDate}T00:00:00.000Z`) + 8 * 86400000).toISOString().slice(0, 10),
+      reason: "Extended medical leave",
+    }, login.cookie);
+    assert.equal(overLimitLeave.status, 409);
+    const leavesAfterRejectedApproval = await request(base, "/api/student/leaves", undefined, login.cookie);
+    assert.equal(leavesAfterRejectedApproval.body.applications[0].status, "pending");
+    assert.equal(leavesAfterRejectedApproval.body.balances.medical.remaining, 8);
     assert.equal((await request(base, "/api/auth/logout", {}, login.cookie)).status, 200);
   } finally {
     const user = await User.findOne({ email }).select("_id");

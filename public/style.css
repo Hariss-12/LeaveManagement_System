@@ -59,9 +59,10 @@ input:focus, select:focus, textarea:focus { outline: 3px solid rgba(23, 91, 78, 
 .profile-card p { margin-bottom: 5px; }
 .balance-grid { display: flex; gap: 14px; }
 .balance-grid > div { min-width: 150px; padding: 14px; border-radius: 12px; background: #eff6f3; }
-.balance-grid span, .balance-grid strong { display: block; }
+.balance-grid span, .balance-grid strong, .balance-grid small { display: block; }
 .balance-grid span { color: var(--muted); font-size: .84rem; }
 .balance-grid strong { margin-top: 8px; color: var(--green); font-size: 1.5rem; }
+.balance-grid small { margin-top: 4px; color: var(--muted); font-size: .78rem; }
 .student-grid { display: grid; grid-template-columns: minmax(280px, .85fr) minmax(0, 1.15fr); gap: 22px; align-items: start; }
 .panel { padding: 24px; }
 .panel h2 { margin-bottom: 8px; }
