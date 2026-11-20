@@ -119,7 +119,9 @@ test("registration, sessions, leave requests, and warden review", async () => {
     }, login.cookie);
     assert.equal(overLimitLeave.status, 409);
     const leavesAfterRejectedApproval = await request(base, "/api/student/leaves", undefined, login.cookie);
-    assert.equal(leavesAfterRejectedApproval.body.applications[0].status, "pending");
+    // The newest application is the third request, which was approved above.
+    // The over-limit request was rejected at submission and is not in history.
+    assert.equal(leavesAfterRejectedApproval.body.applications[0].status, "approved");
     assert.equal(leavesAfterRejectedApproval.body.balances.medical.remaining, 8);
     assert.equal((await request(base, "/api/auth/logout", {}, login.cookie)).status, 200);
   } finally {
